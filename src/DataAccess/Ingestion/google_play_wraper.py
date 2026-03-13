@@ -1,8 +1,5 @@
 from typing import Dict, List, Optional
-
-import pandas as pd
 from google_play_scraper import reviews, Sort
-
 
 class GooglePlayScraper:
 

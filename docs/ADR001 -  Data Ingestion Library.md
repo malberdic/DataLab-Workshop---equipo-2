@@ -34,7 +34,56 @@ Comparación con baseline: …
 Chequeos (ej: leakage): …
 
 ##### Implementación
-Pasos concretos, tipo checklist, para llevar a cabo e implementar la decisión tomada:
 
 1. Escribir un módulo dentro de **src/DataAccess/Ingestion** que envuelva la implementacion de la librería.
 2. Llamar dicho módulo desde la capa de **Orchestration**, para que coordine la descarga de las reseñas y almacenamiento de los datos llamando al módulo correspondiente dentro de **DataAccess/Storage**.
+
+Puntualmente, se utilizará el método *reviews* siguiendo las sugerencias provistas por la documentacion de la librería
+
+```python
+batch, token = reviews(
+                app_id,
+                lang=self.lang,
+                country=self.country,
+                sort=sort,
+                count=min(200, remaining),
+                continuation_token=token
+            )
+```
+
+Esto retorna una lista de diccionarios, compuestos por los siguientes campos
+* reviewId
+* userName
+* userImage
+* content
+* score
+* thumbsUpCount
+* reviewCreatedVersion
+* at
+* replyContent
+* repliedAt
+* appVersion
+
+De los cuales sólo utilizaremos los siguientes.
+
+| Campo | Descripción |
+|---|---|
+| `content` | Texto de la reseña |
+| `score` | Puntaje del usuario (1–5 estrellas) |
+| `thumbsUpCount` | Cantidad de likes de la reseña |
+| `reviewCreatedVersion` | Versión de la app al momento de la reseña |
+| `at` | Fecha de la reseña |
+
+Para este sprint, los campos utilizados son `content` (texto) y `score`.
+
+Para más información sobre la librería, visitar https://pypi.org/project/google-play-scraper/
+
+##### Prueba rápida
+
+El siguiente script, descarga el conjunto de los últimos 1000 reseñas de whatsapp y guarda el resultado dentro de la carpeta ***data***
+
+```python
+scrapper = GooglePlayScraper(lang="es", country="ar")
+results = scrapper.get_reviews(app_id="com.whatsapp", limit=1000)
+CSVReviewRepository().save(pd.DataFrame(results), "data/reviews.csv")
+```
