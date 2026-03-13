@@ -2,7 +2,7 @@ import pandas as pd
 from transformers import pipeline
 
 from src.Models.analyze_reviews import classify_sentiment, extract_top_features
-from DataAccess.Ingestion.google_play_wraper import GooglePlayScraper
+from DataAccess.Ingestion.google_play_wrapper import GooglePlayScraper
 from src.DataAccess.Storage.csv_review_repository import CSVReviewRepository
 
 class GooglePlayService:
