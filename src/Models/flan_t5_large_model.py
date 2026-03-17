@@ -1,6 +1,11 @@
+from enum import StrEnum
 import re
 from transformers import pipeline
 
+class Sentiments(StrEnum):
+    POSITIVE = "positive"
+    NEUTRAL = "neutral"
+    NEGATIVE = "negative"
 
 class FlanT5LargeModel:
     """
@@ -34,7 +39,10 @@ class FlanT5LargeModel:
             max_length=512,  # TODO: verify correct context size for the model
         )
 
-    def extract_top_features(self, reviews: list[str], sentiment: str, top_n: int) -> list[str]:
+    def extract_top_features(self, 
+                             reviews: list[str],
+                             sentiment: str, 
+                             top_n: int) -> list[str]:
         """
         Extracts the most mentioned features from a set of reviews.
 

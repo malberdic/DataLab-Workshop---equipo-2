@@ -33,7 +33,7 @@ class GoogleReviewCleaner:
         return reviews
 
     @staticmethod
-    def validate_reviews(reviews: pd.DataFrame) -> bool:
+    def validate_schema(reviews: pd.DataFrame) -> bool:
         """Valida que el DataFrame tenga las columnas necesarias."""
         if CONTENT_COL not in reviews.columns:
             print(f"Error: No se encontró la columna '{CONTENT_COL}' en el DataFrame.") #TODO reemplazar por logger
