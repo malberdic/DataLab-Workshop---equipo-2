@@ -74,7 +74,7 @@ class RobertaSentimentModel:
 
         # Run inference on the review column
         results = self.pipeline(
-            df[content_col],
+            df[content_col].astype(str).tolist(),
             batch_size=32  # Batch inference for efficiency
         )
 

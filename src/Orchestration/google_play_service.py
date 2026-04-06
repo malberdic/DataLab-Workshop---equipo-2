@@ -3,12 +3,12 @@ from typing import List
 
 import pandas as pd
 
-from Orchestration.path_helper import PathHelper, PipelineStep
-from DataAccess.Ingestion.google_play_wrapper import GooglePlayScraper
-from DataAccess.Refinary.google_review_cleaner import GoogleReviewCleaner
-from DataAccess.Storage.csv_review_repository import CSVReviewRepository
-from Models.flan_t5_large_model import FlanT5LargeModel, Sentiments
-from Models.roberta_sentiment_model import RobertaSentimentModel
+from src.Orchestration.path_helper import PathHelper, PipelineStep
+from src.DataAccess.Ingestion.google_play_wrapper import GooglePlayScraper
+from src.DataAccess.Refinary.google_review_cleaner import GoogleReviewCleaner
+from src.DataAccess.Storage.csv_review_repository import CSVReviewRepository
+from src.Models.flan_t5_large_model import FlanT5LargeModel, Sentiments
+from src.Models.roberta_sentiment_model import RobertaSentimentModel
 
 
 # Cuántas reseñas mandarle al modelo de resumen (no saturar?)
@@ -113,3 +113,6 @@ class GooglePlayService:
             "analyzed": analyzed,
             "summary": summary
             }
+    
+
+    

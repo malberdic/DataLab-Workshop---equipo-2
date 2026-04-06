@@ -33,7 +33,7 @@ class FlanT5LargeModel:
         print(f"Loading model: {self.SUMMARY_MODEL}")
 
         self.pipeline = pipeline(
-            "text2text-generation",  # TODO: verify correct pipeline type for FLAN-T5
+            "text-generation",  # TODO: verify correct pipeline type for FLAN-T5
             model=self.SUMMARY_MODEL,
             truncation=True,
             max_length=512,  # TODO: verify correct context size for the model
