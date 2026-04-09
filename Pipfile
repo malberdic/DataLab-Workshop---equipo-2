@@ -1,0 +1,29 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+
+# Scraping
+google-play-scraper = "*"
+
+# Data Analysis
+pandas = "*"
+numpy = "*"
+
+# Visualization
+matplotlib = "*"
+seaborn = "*"
+plotly = "*"
+
+# Interactive Environment
+jupyterlab = "*"
+ipykernel = "*"
+
+[dev-packages]
+pytest = "*"
+black = "*"
+
+[requires]
+python_version = "3.13"
