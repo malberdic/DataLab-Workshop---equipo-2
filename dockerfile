@@ -1,14 +1,10 @@
 
-FROM python:3.9
-
-RUN useradd -m -u 1000 user
-USER user
-ENV PATH="/home/user/.local/bin:$PATH"
+FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY --chown=user ./requirements.txt requirements.txt
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
-
-COPY --chown=user . /app
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . /app
+WORKDIR /app/src/API
+CMD ["uvicorn", "review_api:app", "--host", "0.0.0.0", "--port", "7860"]
