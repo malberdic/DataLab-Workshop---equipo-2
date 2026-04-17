@@ -12,6 +12,7 @@ __pycache__/
 venv/
 env/
 ENV/
+.env
 
 # =========================
 # Python build artifacts
@@ -85,3 +86,4 @@ dist/
 *.feather
 *.pkl
 *.joblib
+.vscode/launch.json
