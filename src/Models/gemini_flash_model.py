@@ -296,4 +296,6 @@ class GeminiFlashModel:
     
         prompt = self._build_foda_prompt(stats, praised, criticized, version_analysis, neutral_sample)
     
-        return self.call_foda_api(prompt)
+        foda_call = self.call_foda_api(prompt)
+
+        return foda_call

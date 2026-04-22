@@ -62,6 +62,35 @@ class GooglePlayService:
         stats = ReviewStats.from_dataframe(reviews_df)
 
         #────────────────── SUMMARY ──────────────────
+        
+        summary = self.generate_summarey(reviews_df)
+        
+        #────────────────── FODA ──────────────────
+
+        if any("Gemini error" in feature for feature in summary.positive) or any("Gemini error" in feature for feature in summary.negative):
+            foda_analysis = FodaAnalysis(
+                fortalezas = ["No se pudieron analizar las fortalezas debido a un error en el modelo de resumen."],
+                debilidades = ["No se pudieron analizar las debilidades debido a un error en el modelo de resumen."],
+                oportunidades = ["No se pudieron analizar las oportunidades debido a un error en el modelo de resumen."],
+                amenazas = ["No se pudieron analizar las amenazas debido a un error en el modelo de resumen."],
+                resumen_ejecutivo = "No se pudo generar el resumen ejecutivo debido a un error en el modelo de resumen.")
+        else:
+            foda_analysis = self.generate_foda(reviews_df, 
+                                               summary.positive, 
+                                               summary.negative, 
+                                               stats)
+        #────────────────── RESULT ──────────────────
+
+        result = self.format_pipeline_result(
+            app_id=app_id,  
+            limit=limit,
+            summary=summary,
+            foda=foda_analysis,
+            stats=stats)
+
+        return result
+
+    def generate_summarey(self, reviews_df: pd.DataFrame) -> FeatureSummary:
         weighted_positive_reviews = self.prepare_weighted_reviews(reviews_df, 
                                                                   Sentiments.POSITIVE.value)
         positive_features = self.summarization_model.extract_top_features(weighted_positive_reviews,
@@ -74,12 +103,16 @@ class GooglePlayService:
                                                                           sentiment = Sentiments.NEGATIVE.value,
                                                                           top_n=5)
         
-        summary = FeatureSummary(positive=positive_features, negative=negative_features)
-        
-        
-        #────────────────── SUMMARY ──────────────────
+        return FeatureSummary(positive=positive_features, negative=negative_features)
+
+    def generate_foda(self, 
+                      reviews_df: pd.DataFrame, 
+                      positive_features: list, 
+                      negative_features: list, 
+                      stats: ReviewStats) -> FodaAnalysis:
+
         neutral_features = reviews_df[reviews_df[review_columns.SENTIMENT_COL] == "neutral"][review_columns.CONTENT_COL].tolist()
-        
+
         version_analysis = self.analyze_by_version(reviews_df)
 
         foda_result = self.summarization_model.generate_foda(
@@ -89,24 +122,11 @@ class GooglePlayService:
             version_analysis = version_analysis,
             stats = stats)
 
-        foda_analysis = FodaAnalysis(
-            fortalezas = foda_result.get("fortalezas", []),
-            debilidades = foda_result.get("debilidades", []),
-            oportunidades = foda_result.get("oportunidades", []),
-            amenazas = foda_result.get("amenazas", []),
-            resumen_ejecutivo = foda_result.get("resumen_ejecutivo", "")
-        )
-        #────────────────── RESULT ──────────────────
-
-        result = PipelineResult(
-            app_id=app_id,  
-            limit=limit,
-            summary=summary,
-            foda=foda_analysis,
-            stats=stats)
-
-
-        return result
+        return FodaAnalysis(fortalezas = foda_result.get("fortalezas", []),
+                            debilidades = foda_result.get("debilidades", []),
+                            oportunidades = foda_result.get("oportunidades", []),
+                            amenazas = foda_result.get("amenazas", []),
+                            resumen_ejecutivo = foda_result.get("resumen_ejecutivo", ""))
 
 
     def prepare_weighted_reviews(self,
@@ -148,3 +168,20 @@ class GooglePlayService:
         stats = self.cleaner.filter_versions(stats)
 
         return self.cleaner.format_version_report(stats)
+    
+
+    def format_pipeline_result(self, app_id: str, limit: int, summary: FeatureSummary, foda: FodaAnalysis, stats: ReviewStats) -> PipelineResult:
+
+        if any("Gemini error" in feature for feature in summary.positive):
+            summary.positive = ["No se pudieron extraer aspectos positivos debido a un error del modelo."]
+
+        if any("Gemini error" in feature for feature in summary.negative):
+            summary.negative = ["No se pudieron extraer aspectos negativos debido a un error del modelo."]
+
+        return PipelineResult(
+            app_id=app_id,
+            limit=limit,
+            summary=summary,
+            foda=foda,
+            stats=stats
+        )
