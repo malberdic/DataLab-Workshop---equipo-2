@@ -45,7 +45,7 @@ STAR_TO_SENTIMENT = {
     "5 stars": "positive",
 }
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = "hola" # os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     sys.exit(
         "Error: Variable de entorno GEMINI_API_KEY no configurada.\n"
@@ -168,7 +168,7 @@ def analyze_by_version(df: pd.DataFrame) -> str:
         flag = " ⚠️" if pct_neg > 40 else ""
         score_str = f"{row['score_promedio']:.1f}" if "score_promedio" in row else "N/A"
         lines.append(
-            f"  {str(version):<16} {int(row['total']):>6} "
+            f"{str(version):<16} {int(row['total']):>6} "
             f"{int(row['positivas']):>7} {int(row['negativas']):>7} "
             f"{int(row['neutrales']):>7} {score_str:>8}{flag}"
         )
@@ -516,7 +516,7 @@ def main():
     df.to_csv(output_csv, index=False)
     print(f"\nCSV con sentimientos: {output_csv}")
 
-    # TODO [PARKING LOT]: Exportar FODA como JSON
+    # TODO [PARKING LOT]: Exportar FODA como JSONf
     # Descomentar junto con el bloque FODA de arriba.
     # if "error" not in foda:
     #     foda_path = args.csv.replace(".csv", "_foda.json")

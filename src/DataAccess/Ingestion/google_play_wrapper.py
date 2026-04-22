@@ -1,11 +1,15 @@
+print("Importing typing")
 from typing import Dict, List, Optional
+print("Importing google_play_scraper")
 from google_play_scraper import reviews, Sort
 
 class GooglePlayScraper:
 
     def __init__(self, lang: str = "es", country: str = "ar"):
+        print("Initializing GooglePlayScraper with lang =", lang, "and country =", country)
         self.lang = lang
         self.country = country
+        print(f"GooglePlayScraper initialized with lang='{self.lang}' and country='{self.country}'")
 
     def get_reviews(
         self,

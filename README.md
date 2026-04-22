@@ -1,2 +1,8 @@
-# DataLab-Workshop---equipo-2
-Proyecto del equipo 2 del DataLab Workshop, cuarta edición.
+title: Demo Smar Reviewer
+emoji: 🏆
+colorFrom: indigo
+colorTo: green
+sdk: docker
+pinned: false
+license: mit
+short_description: Demo
