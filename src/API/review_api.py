@@ -79,9 +79,7 @@ def run_pipeline(
         raise HTTPException(status_code=500, detail=str(exc))
 
     return {
-        "app_id": app_id,
-        "limit": limit,
-        "summary": asdict(result)
+        "result": asdict(result)
     }
 
 @app.get("/ready")

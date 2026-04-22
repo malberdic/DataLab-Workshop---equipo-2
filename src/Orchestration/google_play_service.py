@@ -8,8 +8,9 @@ import pandas as pd
 from src.DataAccess.Ingestion.google_play_wrapper import GooglePlayScraper
 from src.DataAccess.Refinary.google_review_cleaner import GoogleReviewCleaner, review_columns
 # from src.DataAccess.Storage.csv_review_repository import CSVReviewRepository
-from src.Models.gemini_flash_summary_model import GeminiFlashModel, Sentiments
+from src.Models.gemini_flash_model import GeminiFlashModel, Sentiments
 from src.Models.nlptown_bert_base_model import BertBaseSentimentModel
+from src.Orchestration.review_stats import ReviewStats
 
 
 # Cuántas reseñas mandarle al modelo de resumen (no saturar?)
@@ -20,30 +21,37 @@ class FeatureSummary:
     positive: list[str]
     negative: list[str]
 
+@dataclass 
+class FodaAnalysis:
+    fortalezas: list[str]
+    oportunidades: list[str]
+    debilidades: list[str]
+    amenazas: list[str]
+    resumen_ejecutivo: str
+
+@dataclass
+class PipelineResult:
+    app_id: str
+    limit: int
+    summary: FeatureSummary
+    foda: FodaAnalysis
+    stats: ReviewStats
+
 
 class GooglePlayService:
 
     def __init__(self, 
                  scraper: GooglePlayScraper,
                  cleaner: GoogleReviewCleaner,
-                 #repository: CSVReviewRepository,
-                 #path_helper: PathHelper,
                  sentiment_model: BertBaseSentimentModel,
                  summarization_model: GeminiFlashModel):
-        print("Initializing GooglePlayService...")
-        print("Scraper:", scraper)
         self.scraper = scraper
-        print("Cleaner:", cleaner)
         self.cleaner = cleaner
-        #self.repository = repository
-        print("Sentiment Model:", sentiment_model)
         self.sentiment_model = sentiment_model
-        print("Summarization Model:", summarization_model)
         self.summarization_model = summarization_model
-        #self.path_helper = path_helper
     
 
-    def run_pipeline(self, app_id: str, limit=1000) -> FeatureSummary:
+    def run_pipeline(self, app_id: str, limit=1000) -> PipelineResult:
 
         reviews_df = pd.DataFrame(self.scraper.get_reviews(app_id, limit))
         reviews_df = self.cleaner.clean_reviews(reviews_df)
@@ -51,20 +59,54 @@ class GooglePlayService:
         sentiments = self.sentiment_model.classify_sentiment(reviews_df[review_columns.CONTENT_COL].tolist())
         reviews_df[review_columns.SENTIMENT_COL] = sentiments
 
+        stats = ReviewStats.from_dataframe(reviews_df)
+
+        #────────────────── SUMMARY ──────────────────
         weighted_positive_reviews = self.prepare_weighted_reviews(reviews_df, 
                                                                   Sentiments.POSITIVE.value)
-        weighted_negative_reviews = self.prepare_weighted_reviews(reviews_df,
-                                                                  Sentiments.NEGATIVE.value)
-        
         positive_features = self.summarization_model.extract_top_features(weighted_positive_reviews,
                                                                           sentiment = Sentiments.POSITIVE.value,
-                                                                     top_n=3)
+                                                                          top_n=5)
         
+        weighted_negative_reviews = self.prepare_weighted_reviews(reviews_df,
+                                                                  Sentiments.NEGATIVE.value)
         negative_features = self.summarization_model.extract_top_features(weighted_negative_reviews,
                                                                           sentiment = Sentiments.NEGATIVE.value,
-                                                                          top_n=3)
+                                                                          top_n=5)
         
-        return FeatureSummary(positive=positive_features, negative=negative_features)
+        summary = FeatureSummary(positive=positive_features, negative=negative_features)
+        
+        
+        #────────────────── SUMMARY ──────────────────
+        neutral_features = reviews_df[reviews_df[review_columns.SENTIMENT_COL] == "neutral"][review_columns.CONTENT_COL].tolist()
+        
+        version_analysis = self.analyze_by_version(reviews_df)
+
+        foda_result = self.summarization_model.generate_foda(
+            praised = positive_features,
+            neutral = neutral_features,
+            criticized = negative_features,
+            version_analysis = version_analysis,
+            stats = stats)
+
+        foda_analysis = FodaAnalysis(
+            fortalezas = foda_result.get("fortalezas", []),
+            debilidades = foda_result.get("debilidades", []),
+            oportunidades = foda_result.get("oportunidades", []),
+            amenazas = foda_result.get("amenazas", []),
+            resumen_ejecutivo = foda_result.get("resumen_ejecutivo", "")
+        )
+        #────────────────── RESULT ──────────────────
+
+        result = PipelineResult(
+            app_id=app_id,  
+            limit=limit,
+            summary=summary,
+            foda=foda_analysis,
+            stats=stats)
+
+
+        return result
 
 
     def prepare_weighted_reviews(self,
@@ -106,92 +148,3 @@ class GooglePlayService:
         stats = self.cleaner.filter_versions(stats)
 
         return self.cleaner.format_version_report(stats)
-    
-
-    ### DEPRECATED METHODS - to be removed after refactor ###
-    
-    # def deprecated_collect_and_store_reviews(self, 
-    #                               app_id, 
-    #                               limit=1000) -> pd.DataFrame:
-    #     reviews_df = pd.DataFrame(self.scraper.get_reviews(app_id, limit))
-    #     path = self.path_helper.build_review_step_filename(pipeline_step=PipelineStep.RAW)
-    #     self.repository.save(reviews_df, path)
-
-    #     return reviews_df
-
-
-    # def deprecated_clean_reviews(self, 
-    #                   reviews_df: pd.DataFrame) -> pd.DataFrame:
-
-    #     reviews_df = self.cleaner.clean_reviews(reviews_df)
-    #     path = self.path_helper.build_review_step_filename(pipeline_step=PipelineStep.CLEAN)
-    #     self.repository.save(reviews_df, path)
-
-    #     return reviews_df
-
-
-    # def deprecated_analyze_sentiment(self, 
-    #                       reviews_df: pd.DataFrame) -> pd.DataFrame:
-        
-    #     if not self.cleaner.validate_schema(reviews_df):
-    #         raise ValueError("Invalid review data")
-
-    #     reviews_df[review_columns.SENTIMENT_COL] = self.sentiment_model.classify_sentiment(reviews_df, content_col=review_columns.CONTENT_COL)
-    #     path = self.path_helper.build_review_step_filename(pipeline_step=PipelineStep.ANALYZED)
-    #     self.repository.save(reviews_df, path)
-    #     return reviews_df
-
-
-    # def deprecated_build_summary(self, 
-    #                   reviews_df: pd.DataFrame) -> pd.DataFrame:
-
-    #     positive_features = self._summarize_reviews(reviews_df, Sentiments.POSITIVE, MAX_REVIEWS_FOR_SUMMARY)
-    #     negative_features = self._summarize_reviews(reviews_df, Sentiments.NEGATIVE, MAX_REVIEWS_FOR_SUMMARY)
-
-    #     summary_df = pd.DataFrame({
-    #         "positive_features": [positive_features],
-    #         "negative_features": [negative_features]
-    #     })
-
-    #     path = self.path_helper.build_review_step_filename(pipeline_step=PipelineStep.SUMMARY)
-
-    #     self.repository.save(summary_df, path)
-
-    #     return summary_df
-    
-    # def deprecated_summarize_reviews(self, 
-    #                        reviews_df: pd.DataFrame,
-    #                        sentiment: Sentiments,
-    #                        sample_size:int,
-    #                        top_n:int=3) -> List[str]:
-
-    #     sentiment_filtered_reviews = reviews_df[reviews_df[review_columns.SENTIMENT_COL] == sentiment.value]
-    #     # Muestra para no exceder el contexto del modelo
-    #     sample = sentiment_filtered_reviews.head(sample_size)
-
-    #     if sample.empty:
-    #         return []   
-        
-    #     top_features = self.summarization_model.extract_top_features(sample[review_columns.CONTENT_COL].tolist(),
-    #                                                                  sentiment = sentiment.value,
-    #                                                                  top_n=top_n)
-    #     return top_features
-    
-
-    # def deprecated_run_pipeline(self, app_id: str, limit=1000) -> dict[str, pd.DataFrame]:
-
-    #     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
-
-    #     self.path_helper.set_filepath_components(app_id, timestamp)
-
-    #     raw_df = self.local_collect_and_store_reviews(app_id, limit)
-    #     clean_df = self.local_clean_reviews(raw_df)
-    #     analyzed = self.local_analyze_sentiment(clean_df)
-    #     summary = self.local_build_summary(analyzed)
-
-    #     return {
-    #         "raw": raw_df,
-    #         "clean": clean_df,
-    #         "analyzed": analyzed,
-    #         "summary": summary
-    #         }

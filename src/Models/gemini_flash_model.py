@@ -1,10 +1,11 @@
 from enum import StrEnum
 import json
-import os
 import re
 from typing import Any, Any, List
 
 from google import genai
+
+from src.Orchestration.review_stats import ReviewStats
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -50,7 +51,7 @@ class GeminiFlashModel:
         if not reviews:
             return [f"(No reviews found for sentiment '{sentiment}')"]
 
-        prompt = self._build_prompt(reviews, sentiment, top_n)
+        prompt = self._build_summary_prompt(reviews, sentiment, top_n)
 
         try:
             response = self.client.models.generate_content(
@@ -60,16 +61,16 @@ class GeminiFlashModel:
 
             raw = response.text.strip()
 
-            return self._parse_output(raw, top_n)
+            return self._summary_parse_output(raw, top_n)
 
         except Exception as e:
             return [f"(Gemini error: {str(e)})"]
 
     # ─────────────────────────────────────────────
-    # Prompt
+    # Prompts
     # ─────────────────────────────────────────────
 
-    def _build_prompt(
+    def _build_summary_prompt(
         self,
         reviews: List[str],
         sentiment: str,
@@ -118,14 +119,16 @@ class GeminiFlashModel:
 
             RESEÑAS:
             {joined}"""
+    
+    
 
     # ─────────────────────────────────────────────
     # Parsing
     # ─────────────────────────────────────────────
 
-    def _parse_output(self, raw: str, top_n: int) -> List[str]:
+    def _summary_parse_output(self, raw: str, top_n: int) -> List[str]:
 
-        cleaned = self._strip_code_fences(raw)
+        cleaned = self._summary_strip_code_fences(raw)
 
         try:
             data = json.loads(cleaned)
@@ -133,7 +136,7 @@ class GeminiFlashModel:
 
             if isinstance(aspectos, list) and aspectos:
                 return [
-                    self._format_aspect(a)
+                    self._summary_format_aspect(a)
                     for a in aspectos[:top_n]
                 ]
 
@@ -142,14 +145,14 @@ class GeminiFlashModel:
 
         return self._fallback_parse(raw, top_n)
 
-    def _strip_code_fences(self, raw_text: str) -> str:
+    def _summary_strip_code_fences(self, raw_text: str) -> str:
         if raw_text.startswith("```"):
             raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
             raw_text = re.sub(r"\s*```$", "", raw_text)
         return raw_text.strip()
 
     
-    def _format_aspect(self, a: Any) -> str:
+    def _summary_format_aspect(self, a: Any) -> str:
         if isinstance(a, dict):
             nombre = a.get("aspecto", "?")
             menciones = a.get("menciones_aprox", "?")
@@ -170,7 +173,7 @@ class GeminiFlashModel:
         return str(a).strip()
     
     
-    def _fallback_parse(self, raw: str, top_n: int) -> List[str]:
+    def _summary_fallback_parse(self, raw: str, top_n: int) -> List[str]:
 
         lines = raw.splitlines()
         
@@ -181,3 +184,116 @@ class GeminiFlashModel:
         ]
 
         return features[:top_n] if features else [raw]
+    
+
+    # ─────────────────────────────────────────────
+    # FODA
+    # ─────────────────────────────────────────────
+
+
+    def _build_foda_prompt(self,
+        stats: ReviewStats,
+        praised: list[str],
+        criticized: list[str],
+        version_analysis: str,
+        neutral_sample: str,
+    ) -> str:
+        return f"""Sos un consultor estratégico de producto digital. Con base en el análisis de {stats.total} reseñas de una aplicación móvil, generá un análisis FODA (SWOT) completo.
+    
+    DATOS DE ENTRADA:
+    
+    Distribución de sentimiento:
+    - Positivas: {stats.pct_pos:.1f}% ({stats.count_pos} reseñas)
+    - Negativas: {stats.pct_neg:.1f}% ({stats.count_neg} reseñas)
+    - Neutrales: {stats.pct_neu:.1f}% ({stats.count_neu} reseñas)
+    - Score promedio: {stats.avg_score:.2f}/5 ⭐
+    - Likes promedio por reseña: {stats.avg_likes:.1f}
+    
+    🟢 Aspectos más elogiados:
+    {chr(10).join(f'  {i+1}. {a}' for i, a in enumerate(praised))}
+    
+    🔴 Aspectos más criticados:
+    {chr(10).join(f'  {i+1}. {a}' for i, a in enumerate(criticized))}
+    
+    📱 Análisis por versión de la app:
+    {version_analysis}
+    
+    😐 Muestra de reseñas neutrales (posibles sugerencias):
+    {neutral_sample}
+    
+    INSTRUCCIONES:
+    Generá un JSON con la siguiente estructura exacta:
+    
+    {{
+      "fortalezas": [
+        {{"punto": "descripción concisa", "evidencia": "dato o reseña que lo respalda"}},
+        ...
+      ],
+      "oportunidades": [
+        {{"punto": "descripción concisa", "evidencia": "dato o reseña que lo respalda"}},
+        ...
+      ],
+      "debilidades": [
+        {{"punto": "descripción concisa", "evidencia": "dato o reseña que lo respalda"}},
+        ...
+      ],
+      "amenazas": [
+        {{"punto": "descripción concisa", "evidencia": "dato o reseña que lo respalda"}},
+        ...
+      ],
+      "resumen_ejecutivo": "Párrafo breve (3-4 oraciones) con la conclusión general del análisis."
+    }}
+    
+    REGLAS:
+    - Entre 3 y 5 puntos por categoría.
+    - Todo en ESPAÑOL.
+    - Las Oportunidades deben derivarse de las sugerencias y necesidades no cubiertas de los usuarios.
+    - Las Amenazas deben inferirse de tendencias negativas (ej: si una actualización reciente genera muchas quejas, eso es una amenaza de churn).
+    - Incluí evidencia concreta (citas de reseñas, porcentajes, datos de versiones).
+    - No incluyas texto fuera del JSON.
+    """
+    
+    
+    # ── Llamado a la API y formateo de respuesta ───────────────────────────────────
+    
+    def call_foda_api(self, prompt: str) -> dict:
+        try:
+            response = self.client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt,
+            )
+    
+            raw_text = response.text.strip()
+            if raw_text.startswith("```"):
+                raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+                raw_text = re.sub(r"\s*```$", "", raw_text)
+    
+            return json.loads(raw_text)
+    
+        except json.JSONDecodeError:
+            print("  ⚠ Gemini no devolvió JSON válido para el FODA.")
+            return {"error": response.text[:500]}
+    
+        except Exception as e:
+            return {"error": str(e)}
+    
+    
+    # ── Orquestador (mantiene la firma pública original) ───────────────────────────
+    
+    def generate_foda(
+        self,
+        praised: list[str],
+        neutral: list[str],
+        criticized: list[str],
+        version_analysis: str,
+        stats: ReviewStats,
+    ) -> dict:
+        """
+        Genera un análisis FODA completo usando Gemini, alimentado por
+        los aspectos ya extraídos, la data de versiones, y las reseñas.
+        """
+        neutral_sample = "\n".join(f"- {r[:200]}" for r in neutral[:30])
+    
+        prompt = self._build_foda_prompt(stats, praised, criticized, version_analysis, neutral_sample)
+    
+        return self.call_foda_api(prompt)

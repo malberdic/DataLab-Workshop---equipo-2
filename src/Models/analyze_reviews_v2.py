@@ -168,7 +168,7 @@ def analyze_by_version(df: pd.DataFrame) -> str:
         flag = " ⚠️" if pct_neg > 40 else ""
         score_str = f"{row['score_promedio']:.1f}" if "score_promedio" in row else "N/A"
         lines.append(
-            f"  {str(version):<16} {int(row['total']):>6} "
+            f"{str(version):<16} {int(row['total']):>6} "
             f"{int(row['positivas']):>7} {int(row['negativas']):>7} "
             f"{int(row['neutrales']):>7} {score_str:>8}{flag}"
         )

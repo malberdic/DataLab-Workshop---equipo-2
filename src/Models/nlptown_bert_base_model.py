@@ -22,8 +22,6 @@ class BertBaseSentimentModel:
 
     def classify_sentiment(self, content: list[str]) -> list[str]:
         """Clasifica sentimiento con nlptown (multilingüe)."""
-        print(f"Cargando modelo de sentimiento: {SENTIMENT_MODEL}")
-
         labels: list[str] = []
         batch_size = 32
         total = len(content)

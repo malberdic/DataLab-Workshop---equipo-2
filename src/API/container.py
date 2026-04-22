@@ -21,12 +21,10 @@ from typing import Dict, Any
 
 from src.DataAccess.Ingestion.google_play_wrapper import GooglePlayScraper
 from src.DataAccess.Refinary.google_review_cleaner import GoogleReviewCleaner
-# from src.DataAccess.Storage.csv_review_repository import CSVReviewRepository
-# from src.Orchestration.path_helper import PathHelper
 from src.Orchestration.google_play_service import GooglePlayService
 
 from src.Models.nlptown_bert_base_model import BertBaseSentimentModel
-from src.Models.gemini_flash_summary_model import GeminiFlashModel
+from src.Models.gemini_flash_model import GeminiFlashModel
 
 
 class Container:
@@ -76,22 +74,6 @@ class Container:
             lambda: GoogleReviewCleaner()
         )
 
-    # def repository(self) -> CSVReviewRepository:
-    #     """
-    #     NOTE:
-    #     CSV is NOT safe under concurrent writes.
-    #     Consider replacing with SQLite or external storage.
-    #     """
-    #     return self._get(
-    #         "repository",
-    #         lambda: CSVReviewRepository()
-    #     )
-
-    # def path_helper(self) -> PathHelper:
-    #     return self._get(
-    #         "path_helper",
-    #         lambda: PathHelper()
-    #     )
 
     # ------------------------------------------------------------------
     # Model Layer
@@ -128,10 +110,8 @@ class Container:
             lambda: GooglePlayService(
                 scraper=self.scraper(),
                 cleaner=self.cleaner(),
-                #repository=self.repository(),
                 sentiment_model=self.sentiment_model(),
                 summarization_model=self.summarization_model(),
-                #path_helper=self.path_helper(),
             )
         )
 
